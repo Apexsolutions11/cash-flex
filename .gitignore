@@ -21,6 +21,13 @@
 **/.packages
 **/pubspec.lock
 
+# Exclude large build files
+**/*.apk
+**/*.aab
+**/*.so
+**/app/intermediates/
+**/app/outputs/
+
 # IDE
 **/.idea/
 **/.vscode/
