@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.leader.cashalpha",
+      "sha256_cert_fingerprints": [
+        "23:56:21:94:E5:B5:E5:F6:24:9D:6E:7B:6B:18:C7:F8:2E:EB:1A:A9:EA:5E:6C:26:16:44:3A:CF:00:81:76:26"
+      ]
+    }
+  }
+]
+  

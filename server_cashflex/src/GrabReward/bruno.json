@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "GrabReward-Bruno",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

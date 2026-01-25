@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reset-leaderboard",
+      "schedule": "29 12 * * *"
+    },
+    {
+      "path": "/api/cron/reset-payout-count",
+      "schedule": "29 12 * * *"
+    },
+    {
+      "path": "/api/cron/reset-daily-game-count",
+      "schedule": "29 12 * * *"
+    }
+  ]
+}

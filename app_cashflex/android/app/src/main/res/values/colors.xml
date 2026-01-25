@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Standard colors required by Mintegral SDK -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>
+
