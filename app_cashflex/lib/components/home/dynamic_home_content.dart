@@ -123,6 +123,12 @@ class DynamicHomeContent extends ConsumerWidget {
         while (i < enabledComponents.length) {
           final current = enabledComponents[i];
 
+          // Skip promo-app-1 and promo-app-2 (they're now at the top of home page)
+          if (current.id == 'promo-app-1' || current.id == 'promo-app-2') {
+            i++;
+            continue;
+          }
+
           // Headings render as-is (no special pairing)
           if (_isHeading(current)) {
             widgets.add(_buildItem(current));
@@ -242,6 +248,12 @@ class DynamicHomeContent extends ConsumerWidget {
 
           while (i < enabledComponents.length) {
             final current = enabledComponents[i];
+
+            // Skip promo-app-1 and promo-app-2 (they're now at the top of home page)
+            if (current.id == 'promo-app-1' || current.id == 'promo-app-2') {
+              i++;
+              continue;
+            }
 
             if (_isHeading(current)) {
               widgets.add(_buildItem(current));

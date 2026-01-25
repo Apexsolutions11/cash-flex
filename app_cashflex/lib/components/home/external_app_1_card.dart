@@ -5,14 +5,21 @@ import '../../widgets/shimmer_widget.dart' show ExternalAppShimmerCard;
 import 'promotion_app_card.dart';
 
 class ExternalApp1Card extends ConsumerWidget {
-  const ExternalApp1Card({super.key});
+  final bool isFeatured;
+  final double? height;
+  
+  const ExternalApp1Card({super.key, this.isFeatured = false, this.height});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appAsync = ref.watch(externalApp1Provider);
 
     return appAsync.when(
-      data: (app) => PromotionAppCard(app: app),
+      data: (app) => PromotionAppCard(
+        app: app,
+        isHorizontal: isFeatured,
+        height: height ?? (isFeatured ? 140 : null),
+      ),
       loading: () => const ExternalAppShimmerCard(),
       error: (_, __) => const SizedBox.shrink(),
     );

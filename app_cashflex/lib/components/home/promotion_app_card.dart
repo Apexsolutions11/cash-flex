@@ -76,23 +76,25 @@ class PromotionAppCard extends StatelessWidget {
         children: [
           Container(
             height: height ?? 120,
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(height != null && height! > 120 ? 14 : 10),
             decoration: BoxDecoration(
               color: theme.cardTheme.color ?? theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
               border: Border.all(
-                color: theme.colorScheme.outlineVariant.withOpacity(0.3),
-                width: 1,
+                color: theme.colorScheme.outlineVariant.withOpacity(height != null && height! > 120 ? 0.2 : 0.3),
+                width: height != null && height! > 120 ? 1.5 : 1,
               ),
-              boxShadow: AppTheme.cardShadowSmall,
+              boxShadow: height != null && height! > 120 
+                  ? AppTheme.cardShadowMedium 
+                  : AppTheme.cardShadowSmall,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Square image on the left
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: height != null && height! > 120 ? 110 : 100,
+                  height: height != null && height! > 120 ? 110 : 100,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppTheme.borderRadiusSmall),
                     image: app.photo != null
@@ -105,12 +107,15 @@ class PromotionAppCard extends StatelessWidget {
                     gradient: app.photo == null
                         ? AppTheme.primaryGradient
                         : null,
+                    boxShadow: height != null && height! > 120 && app.photo != null
+                        ? AppTheme.cardShadowSmall
+                        : null,
                   ),
                   child: app.photo == null
                       ? Center(
                           child: Icon(
                             TablerIcons.device_gamepad_2,
-                            size: 32,
+                            size: height != null && height! > 120 ? 36 : 32,
                             color: theme.colorScheme.onPrimary.withOpacity(0.5),
                           ),
                         )
@@ -128,7 +133,7 @@ class PromotionAppCard extends StatelessWidget {
                         app.title ?? 'App',
                         style: TextStyle(
                           color: theme.textTheme.titleMedium?.color,
-                          fontSize: 17,
+                          fontSize: height != null && height! > 120 ? 18 : 17,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.3,
                         ),

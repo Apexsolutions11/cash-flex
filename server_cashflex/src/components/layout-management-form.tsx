@@ -104,15 +104,19 @@ const COMPONENT_LABELS: Record<ComponentId, string> = {
 const getComponentLabel = (id: string) =>
   (COMPONENT_LABELS as Record<string, string>)[id] ?? id
 
-// Fixed components that cannot be rearranged (always appear after wallet)
+// Fixed components that cannot be rearranged
+// These components have fixed positions in the UI:
+// - promo-app-1, promo-app-2: Always at top row (horizontal, side-by-side)
+// - how-to-earn-follow-us: Always at second row right (Watch & Follow buttons)
+// Admins can enable/disable these but cannot change their position or order
 const FIXED_HOMEPAGE_COMPONENTS: ComponentId[] = [
-  "how-to-earn-follow-us",
+  "promo-app-1",  // Fixed top row left
+  "promo-app-2",  // Fixed top row right
+  "how-to-earn-follow-us",  // Fixed second row right
 ]
 
-// Draggable components
+// Draggable components (can be reordered via admin panel)
 const DEFAULT_HOMEPAGE_COMPONENTS: ComponentId[] = [
-  "promo-app-1",
-  "promo-app-2",
   "promo-app-3",
   "promo-app-4",
   "review-offers",

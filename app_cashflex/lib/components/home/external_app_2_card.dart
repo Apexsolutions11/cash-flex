@@ -11,7 +11,10 @@ import '../../theme/app_theme.dart';
 import '../external_app_modal.dart';
 
 class ExternalApp2Card extends ConsumerWidget {
-  const ExternalApp2Card({super.key});
+  final bool isFeatured;
+  final double? height;
+  
+  const ExternalApp2Card({super.key, this.isFeatured = false, this.height});
 
   void _showModal(BuildContext context, ExternalAppModel app) {
     if (app.isEmpty) return;
@@ -58,8 +61,8 @@ class ExternalApp2Card extends ConsumerWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                height: 120, // Match the height of first app
-                padding: const EdgeInsets.all(10),
+                height: height ?? (isFeatured ? 140 : 120),
+                padding: EdgeInsets.all(isFeatured ? 14 : 10),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
                   borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
@@ -67,11 +70,11 @@ class ExternalApp2Card extends ConsumerWidget {
                     color: isDark
                         ? Colors.white.withOpacity(0.1)
                         : Colors.grey.withOpacity(0.2),
-                    width: 1,
+                    width: isFeatured ? 1.5 : 1,
                   ),
                   boxShadow: isDark
                       ? null
-                      : AppTheme.cardShadowSmall,
+                      : (isFeatured ? AppTheme.cardShadowMedium : AppTheme.cardShadowSmall),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +90,7 @@ class ExternalApp2Card extends ConsumerWidget {
                             app.title ?? 'App',
                             style: TextStyle(
                               color: theme.textTheme.titleMedium?.color,
-                              fontSize: 17,
+                              fontSize: isFeatured ? 18 : 17,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.3,
                             ),
@@ -165,7 +168,7 @@ class ExternalApp2Card extends ConsumerWidget {
                     AspectRatio(
                       aspectRatio: 1.0,
                       child: Container(
-                        width: 120,
+                        width: isFeatured ? 110 : 120,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppTheme.borderRadiusSmall),
                           image: app.photo != null
@@ -178,12 +181,15 @@ class ExternalApp2Card extends ConsumerWidget {
                           gradient: app.photo == null
                               ? AppTheme.primaryGradient
                               : null,
+                          boxShadow: isFeatured && app.photo != null
+                              ? AppTheme.cardShadowSmall
+                              : null,
                         ),
                         child: app.photo == null
                             ? Center(
                                 child: Icon(
                                   TablerIcons.device_gamepad_2,
-                                  size: 32,
+                                  size: isFeatured ? 36 : 32,
                                   color: Colors.white.withOpacity(0.5),
                                 ),
                               )

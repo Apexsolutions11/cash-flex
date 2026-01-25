@@ -7,9 +7,13 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../providers/user_provider.dart';
 import '../services/auth_service.dart';
 import '../components/home/home_wallet_card.dart';
-import '../components/home/how_to_earn_follow_us_card.dart';
 import '../components/common/app_badge.dart';
 import '../components/home/dynamic_home_content.dart';
+import '../components/home/external_app_1_card.dart';
+import '../components/home/external_app_2_card.dart';
+import '../pages/follow_and_earn_page.dart';
+import '../utils/constant/constant.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/layout_provider.dart';
 import '../services/layout_service.dart';
 import '../services/jackpot_service.dart';
@@ -98,6 +102,27 @@ class _HomePageState extends ConsumerState<HomePage> {
         _startReminderTimer();
       }
     });
+  }
+
+  Uri? _normalizeHowToEarnUri(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    // If admin provides just the 11-char YouTube video ID.
+    final idOnly = RegExp(r'^[a-zA-Z0-9_-]{11}$');
+    if (idOnly.hasMatch(trimmed)) {
+      return Uri.parse('https://www.youtube.com/watch?v=$trimmed');
+    }
+
+    // If no scheme, assume https.
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : 'https://$trimmed';
+
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null || !uri.hasScheme) return null;
+    return uri;
   }
 
   void _showGemeeJackpotReminder() {
@@ -387,108 +412,287 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
-              // Balance Card (real-time from Firestore)
-              Builder(
-                builder: (context) {
-                  // Setup balance listener only once
-                  if (!_listenerSetup) {
-                    _listenerSetup = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ref.listen(currentUserProvider, (previous, next) {
-                        next.whenData((userData) {
-                          final currentBalance = userData?.balance ?? 0;
-
-                          // Check for balance increase and show toast (max 2 toasts)
-                          if (!_isInitialLoad && _previousBalance != null) {
-                            if (currentBalance > _previousBalance! &&
-                                _toastCount < 2) {
-                              final coinsEarned =
-                                  currentBalance - _previousBalance!;
-                              ToastManager.success(
-                                '🎉 You earned $coinsEarned coins!',
-                              );
-                              _toastCount++;
-                            }
-                          }
-
-                          // Update previous balance
-                          _previousBalance = currentBalance;
-                          _isInitialLoad = false;
-                        });
-                      });
-                    });
-                  }
-
-                  return userAsync.when(
-                    data: (userData) => HomeWalletCard(
-                      balance: userData?.balance ?? 0,
-                      onTap: () =>
-                          BottomNavScope.maybeOf(context)?.goToWallet(),
-                    ),
-                    loading: () => HomeWalletCard(
-                      balance: 0,
-                      onTap: () =>
-                          BottomNavScope.maybeOf(context)?.goToWallet(),
-                    ),
-                    error: (_, __) => HomeWalletCard(
-                      balance: 0,
-                      onTap: () =>
-                          BottomNavScope.maybeOf(context)?.goToWallet(),
-                    ),
-                  );
-                },
-              ),
-
-              SizedBox(height: AppTheme.spacingMedium),
-
-              // Action Buttons (conditionally shown based on layout)
-              Consumer(
-                builder: (context, ref, child) {
-                  final layoutAsync = ref.watch(layoutConfigProvider);
-                  return layoutAsync.when(
-                    data: (layoutConfig) {
-                      final shouldShow =
-                          LayoutService.shouldShowHomepageComponent(
-                            'how-to-earn-follow-us',
+                  // TOP ROW - Featured Games: Scratch & Earn + Fruit Match
+                  // These are fixed position but respect admin enable/disable settings
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final layoutAsync = ref.watch(layoutConfigProvider);
+                      return layoutAsync.when(
+                        data: (layoutConfig) {
+                          final showApp1 = LayoutService.shouldShowHomepageComponent(
+                            'promo-app-1',
                             layoutConfig,
                           );
-                      if (!shouldShow) {
-                        return const SizedBox.shrink();
-                      }
-                      final cfg = layoutConfig == null
-                          ? null
-                          : LayoutService.findComponentConfig(
-                              'how-to-earn-follow-us',
-                              layoutConfig.pageLayout.homepage,
-                            );
-                      final hasBadge =
-                          cfg != null &&
-                          ((cfg.badgeText?.trim().isNotEmpty ?? false) ||
-                              (cfg.badgeVariant?.trim().isNotEmpty ?? false));
+                          final showApp2 = LayoutService.shouldShowHomepageComponent(
+                            'promo-app-2',
+                            layoutConfig,
+                          );
 
-                      if (!hasBadge) return const HowToEarnFollowUsCard();
+                          // If both disabled, don't show row
+                          if (!showApp1 && !showApp2) {
+                            return const SizedBox.shrink();
+                          }
 
-                      return Stack(
-                        children: [
-                          const HowToEarnFollowUsCard(),
-                          Positioned(
-                            top: 0,
-                            right: 16,
-                            child: IgnorePointer(
-                              child: AppBadge(
-                                text: cfg.badgeText,
-                                variant: cfg.badgeVariant,
-                                small: true,
-                              ),
+                          // Show row with enabled apps
+                          return Padding(
+                            padding: AppTheme.paddingHorizontalMedium,
+                            child: Row(
+                              children: [
+                                if (showApp1)
+                                  Expanded(
+                                    child: ExternalApp1Card(isFeatured: true, height: 140),
+                                  ),
+                                if (showApp1 && showApp2)
+                                  SizedBox(width: AppTheme.spacingMediumSmall),
+                                if (showApp2)
+                                  Expanded(
+                                    child: ExternalApp2Card(isFeatured: true, height: 140),
+                                  ),
+                              ],
                             ),
+                          );
+                        },
+                        loading: () => Padding(
+                          padding: AppTheme.paddingHorizontalMedium,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ExternalApp1Card(isFeatured: true, height: 140),
+                              ),
+                              SizedBox(width: AppTheme.spacingMediumSmall),
+                              Expanded(
+                                child: ExternalApp2Card(isFeatured: true, height: 140),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                        error: (_, __) => const SizedBox.shrink(),
                       );
                     },
-                    loading: () => const HowToEarnFollowUsCard(),
-                    error: (_, __) => const HowToEarnFollowUsCard(),
-                  );
-                },
+                  ),
+
+              SizedBox(height: AppTheme.spacingLarge),
+
+              // SECOND ROW - Wallet + Quick Actions
+              Padding(
+                padding: AppTheme.paddingHorizontalMedium,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // LEFT SIDE - Wallet Card (50% width)
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          // Setup balance listener only once
+                          if (!_listenerSetup) {
+                            _listenerSetup = true;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              ref.listen(currentUserProvider, (previous, next) {
+                                next.whenData((userData) {
+                                  final currentBalance = userData?.balance ?? 0;
+
+                                  // Check for balance increase and show toast (max 2 toasts)
+                                  if (!_isInitialLoad && _previousBalance != null) {
+                                    if (currentBalance > _previousBalance! &&
+                                        _toastCount < 2) {
+                                      final coinsEarned =
+                                          currentBalance - _previousBalance!;
+                                      ToastManager.success(
+                                        '🎉 You earned $coinsEarned coins!',
+                                      );
+                                      _toastCount++;
+                                    }
+                                  }
+
+                                  // Update previous balance
+                                  _previousBalance = currentBalance;
+                                  _isInitialLoad = false;
+                                });
+                              });
+                            });
+                          }
+
+                          return userAsync.when(
+                            data: (userData) => HomeWalletCard(
+                              balance: userData?.balance ?? 0,
+                              onTap: () =>
+                                  BottomNavScope.maybeOf(context)?.goToWallet(),
+                            ),
+                            loading: () => HomeWalletCard(
+                              balance: 0,
+                              onTap: () =>
+                                  BottomNavScope.maybeOf(context)?.goToWallet(),
+                            ),
+                            error: (_, __) => HomeWalletCard(
+                              balance: 0,
+                              onTap: () =>
+                                  BottomNavScope.maybeOf(context)?.goToWallet(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(width: AppTheme.spacingMediumSmall),
+                    // RIGHT SIDE - Watch & Earn + Follow & Earn (stacked vertically)
+                    Expanded(
+                      child: Consumer(
+                        builder: (context, ref, child) {
+                          final layoutAsync = ref.watch(layoutConfigProvider);
+                          return layoutAsync.when(
+                            data: (layoutConfig) {
+                              final shouldShow =
+                                  LayoutService.shouldShowHomepageComponent(
+                                    'how-to-earn-follow-us',
+                                    layoutConfig,
+                                  );
+                              if (!shouldShow) {
+                                return const SizedBox.shrink();
+                              }
+                              final cfg = layoutConfig == null
+                                  ? null
+                                  : LayoutService.findComponentConfig(
+                                      'how-to-earn-follow-us',
+                                      layoutConfig.pageLayout.homepage,
+                                    );
+                              final hasBadge =
+                                  cfg != null &&
+                                  ((cfg.badgeText?.trim().isNotEmpty ?? false) ||
+                                      (cfg.badgeVariant?.trim().isNotEmpty ?? false));
+
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Column(
+                                    children: [
+                                      // Watch & Earn button
+                                      Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          gradient: AppTheme.accentGradient,
+                                          borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                          boxShadow: AppTheme.cardShadowSmall,
+                                        ),
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            final raw = howToEarnYoutubeUrl.trim();
+                                            final uri = _normalizeHowToEarnUri(raw);
+                                            if (uri == null) {
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('How to earn link is not configured.')),
+                                                );
+                                              }
+                                              return;
+                                            }
+                                            final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                            if (!ok && context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Could not open the How to earn link.')),
+                                              );
+                                            }
+                                          },
+                                          icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 20),
+                                          label: const Text(
+                                            'Watch & Earn',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: AppTheme.spacingSmall),
+                                      // Follow & Earn button
+                                      Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          gradient: AppTheme.cardGradient2,
+                                          borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                          boxShadow: AppTheme.cardShadowSmall,
+                                        ),
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (context) => const FollowAndEarnPage(),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.person_add, color: Colors.white, size: 20),
+                                          label: const Text(
+                                            'Follow & Earn',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (hasBadge)
+                                    Positioned(
+                                      top: 0,
+                                      right: 0,
+                                      child: IgnorePointer(
+                                        child: AppBadge(
+                                          text: cfg.badgeText,
+                                          variant: cfg.badgeVariant,
+                                          small: true,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                            loading: () => Column(
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.accentGradient,
+                                    borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                  ),
+                                ),
+                                SizedBox(height: AppTheme.spacingSmall),
+                                Container(
+                                  width: double.infinity,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.cardGradient2,
+                                    borderRadius: BorderRadius.circular(AppTheme.borderRadiusRound),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            error: (_, __) => const SizedBox.shrink(),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               SizedBox(height: AppTheme.spacingLarge),
