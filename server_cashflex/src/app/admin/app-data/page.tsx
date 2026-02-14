@@ -1,33 +1,70 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getFirestoreClient } from '@/lib/firebase-client';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirebaseAuth } from '@/lib/firebase-client';
 import { AppDataForm } from '@/components/app-data-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { StatusMessage } from '@/components/status-message';
 
 export default function AppDataPage() {
   const [appData, setAppData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<{ type: 'error'; text: string } | null>(null);
 
   useEffect(() => {
     fetchAppData();
   }, []);
 
-  const fetchAppData = async () => {
+  const getAuthToken = async (): Promise<string> => {
+    const auth = getFirebaseAuth();
+    const user = auth.currentUser;
+    
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+    
     try {
-      const db = getFirestoreClient();
-      const appDataDoc = await getDoc(doc(db, 'admin', 'appData'));
-      
-      if (appDataDoc.exists()) {
-        setAppData(appDataDoc.data() || {});
-      } else {
-        setAppData({});
-      }
+      return await user.getIdToken(true);
     } catch (error) {
+      throw new Error('Failed to get auth token');
+    }
+  };
+
+  const fetchAppData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getAuthToken();
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch('/api/admin/app-data', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch app data' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setAppData(data || {});
+    } catch (error: any) {
       console.error('Error fetching app data:', error);
+      if (error.name === 'AbortError') {
+        setError({ type: 'error', text: 'Request timed out. Please check your connection and try again.' });
+      } else {
+        setError({ type: 'error', text: error.message || 'Failed to load app data. Please refresh the page.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -35,55 +72,42 @@ export default function AppDataPage() {
 
   const handleSave = async (data: any) => {
     setSaving(true);
+    setError(null);
     try {
-      const db = getFirestoreClient();
+      const token = await getAuthToken();
       
-      // Normalize fields to avoid invalid types (same logic as API)
-      const normalized: Record<string, any> = { ...data };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for save
       
-      const coerceNonNegativeInt = (v: any): number => {
-        if (typeof v === 'number' && Number.isFinite(v)) return Math.max(0, Math.trunc(v));
-        if (typeof v === 'string') {
-          const n = Number(v);
-          if (Number.isFinite(n)) return Math.max(0, Math.trunc(n));
-        }
-        return 0;
-      };
+      const response = await fetch('/api/admin/app-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
       
-      // Coin conversion rates
-      normalized.indiaCoinCurFactor = coerceNonNegativeInt(normalized.indiaCoinCurFactor);
-      normalized.foreignCoinCurFactor = coerceNonNegativeInt(normalized.foreignCoinCurFactor);
+      clearTimeout(timeoutId);
       
-      // Daily game limit
-      if (normalized.dailyGameLimit !== undefined) {
-        const limit = coerceNonNegativeInt(normalized.dailyGameLimit);
-        normalized.dailyGameLimit = limit > 0 ? limit : 10;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save app data' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
       
-      // Geemee offerwall reward coins
-      if (normalized.geemeeOfferwallRewardCoins !== undefined) {
-        normalized.geemeeOfferwallRewardCoins = coerceNonNegativeInt(normalized.geemeeOfferwallRewardCoins);
-      }
+      const result = await response.json();
+      setAppData(data); // Update local state with saved data
       
-      // Validate normalUserTrackingParams
-      if (normalized.normalUserTrackingParams !== undefined) {
-        if (!Array.isArray(normalized.normalUserTrackingParams)) {
-          throw new Error('normalUserTrackingParams must be an array');
-        }
-        normalized.normalUserTrackingParams = normalized.normalUserTrackingParams
-          .filter((param: any) => typeof param === 'string' && param.trim().length > 0)
-          .map((param: string) => param.trim().toLowerCase());
-      }
-      
-      // Save to Firestore
-      await setDoc(doc(db, 'admin', 'appData'), normalized, { merge: true });
-      
-      // Note: Token generation would need to be done server-side if required
-      // For now, we'll skip it since it's not critical for the save operation
-      
-      setAppData(normalized);
-    } catch (error) {
+      // Refresh data to get any server-side modifications
+      await fetchAppData();
+    } catch (error: any) {
       console.error('Error saving app data:', error);
+      if (error.name === 'AbortError') {
+        setError({ type: 'error', text: 'Save request timed out. Please try again.' });
+      } else {
+        setError({ type: 'error', text: error.message || 'Failed to save app data. Please try again.' });
+      }
       throw error;
     } finally {
       setSaving(false);
@@ -92,22 +116,32 @@ export default function AppDataPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading app data...</p>
       </div>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <AppDataForm
-          initialData={appData}
-          onSave={handleSave}
-          saving={saving}
+    <div className="space-y-4">
+      {error && (
+        <StatusMessage
+          type="error"
+          message={error}
+          onDismiss={() => setError(null)}
         />
-      </CardContent>
-    </Card>
+      )}
+      <Card>
+        <CardContent className="pt-6">
+          <AppDataForm
+            initialData={appData}
+            onSave={handleSave}
+            saving={saving}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
