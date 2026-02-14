@@ -664,6 +664,7 @@ export function LayoutManagementForm({ onGetAuthToken }: LayoutManagementFormPro
   const handleSave = async () => {
     try {
       setSaving(true)
+      setMessage(null)
       const token = await onGetAuthToken()
       
       // Transform data to match API format
@@ -688,6 +689,10 @@ export function LayoutManagementForm({ onGetAuthToken }: LayoutManagementFormPro
         },
       }
 
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000) // 20 second timeout
+
       const response = await fetch("/api/admin/layouts", {
         method: "POST",
         headers: {
@@ -695,21 +700,36 @@ export function LayoutManagementForm({ onGetAuthToken }: LayoutManagementFormPro
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error("Failed to save layouts")
+        const errorData = await response.json().catch(() => ({ error: "Failed to save layouts" }))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
+      const result = await response.json()
       setMessage({
         type: "success",
-        text: "Layouts saved successfully",
+        text: result.message || "Layouts saved successfully",
       })
       setTimeout(() => setMessage(null), 3000)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving layouts:", error)
-      setMessage({ type: "error", text: "Failed to save layouts" })
-      setTimeout(() => setMessage(null), 3000)
+      if (error.name === 'AbortError') {
+        setMessage({ 
+          type: "error", 
+          text: "Save request timed out. The data might be too large. Please try again or contact support." 
+        })
+      } else {
+        setMessage({ 
+          type: "error", 
+          text: error.message || "Failed to save layouts. Please try again." 
+        })
+      }
+      setTimeout(() => setMessage(null), 5000)
     } finally {
       setSaving(false)
     }

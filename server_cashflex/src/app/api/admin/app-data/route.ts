@@ -107,19 +107,30 @@ export async function POST(request: NextRequest) {
     }
     
     try {
-      await db.collection('admin').doc('appData').set(normalized, { merge: true });
+      // Save app data and update token in parallel for better performance
+      const savePromises = [
+        db.collection('admin').doc('appData').set(normalized, { merge: true }),
+      ];
 
-      // Generate new token when app data changes
-      try {
-        const { genOrderID } = await import('@/lib/helpers/other-service');
-        const newToken = await genOrderID();
-        await db.collection('admin').doc('tokens').update({
-          appDataToken: newToken,
-        });
-      } catch (tokenError) {
-        // Log but don't fail if token update fails
-        console.warn('Failed to update app data token:', tokenError);
-      }
+      // Generate new token when app data changes (non-blocking)
+      const tokenPromise = (async () => {
+        try {
+          const { genOrderID } = await import('@/lib/helpers/other-service');
+          const newToken = await genOrderID();
+          await db.collection('admin').doc('tokens').update({
+            appDataToken: newToken,
+          });
+        } catch (tokenError) {
+          // Log but don't fail if token update fails
+          console.warn('Failed to update app data token:', tokenError);
+        }
+      })();
+
+      // Wait for app data save to complete (token update can happen in background)
+      await Promise.all(savePromises);
+      
+      // Don't wait for token update - it's not critical for the response
+      tokenPromise.catch(() => {}); // Suppress unhandled promise rejection
 
       return NextResponse.json({ success: true, message: 'App data updated successfully' });
     } catch (dbError: any) {
